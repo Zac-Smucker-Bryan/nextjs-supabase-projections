@@ -93,7 +93,24 @@ export async function getProject(id: string): Promise<
     throw new Error(error.message);
   }
 
-  return data as Project & {
+  const collection = Array.isArray(data.collection)
+    ? data.collection[0]
+    : data.collection;
+
+  if (!collection) {
+    throw new Error("Project collection could not be found.");
+  }
+
+  return {
+    ...data,
+    collection: {
+      id: collection.id,
+      name: collection.name,
+    },
+    activity_events: (data.activity_events ?? []) as ActivityEvent[],
+    assumptions: (data.assumptions ?? []) as ProjectionAssumption[],
+    projection_versions: (data.projection_versions ?? []) as ProjectionVersion[],
+  } as Project & {
     collection: { id: string; name: string };
     activity_events: ActivityEvent[];
     assumptions: ProjectionAssumption[];
