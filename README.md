@@ -1,109 +1,107 @@
-<a href="https://demo-nextjs-with-supabase.vercel.app/">
-  <img alt="Next.js and Supabase Starter Kit - the fastest way to build apps with Next.js and Supabase" src="https://demo-nextjs-with-supabase.vercel.app/opengraph-image.png">
-  <h1 align="center">Next.js and Supabase Starter Kit</h1>
-</a>
+# Projections
 
-<p align="center">
- The fastest way to build apps with Next.js and Supabase
-</p>
+Projections is a financial-modeling workspace for building, organizing, and explaining connected business forecasts. It takes the flexibility of an Excel model and gives it a clearer structure, an activity trail, and a place for supporting materials.
 
-<p align="center">
-  <a href="#features"><strong>Features</strong></a> ·
-  <a href="#demo"><strong>Demo</strong></a> ·
-  <a href="#deploy-to-vercel"><strong>Deploy to Vercel</strong></a> ·
-  <a href="#clone-and-run-locally"><strong>Clone and run locally</strong></a> ·
-  <a href="#feedback-and-issues"><strong>Feedback and issues</strong></a>
-  <a href="#more-supabase-examples"><strong>More Examples</strong></a>
-</p>
-<br/>
+## The idea
 
-## Features
+Financial projections rarely live in one spreadsheet tab. A sales forecast may drive revenue in an income statement, which then feeds cash flow and balance-sheet projections. This app treats each piece as its own **project**, then groups and connects related projects in a **collection** so the whole model can be understood together.
 
-- Works across the entire [Next.js](https://nextjs.org) stack
-  - App Router
-  - Pages Router
-  - Proxy
-  - Client
-  - Server
-  - It just works!
-- supabase-ssr. A package to configure Supabase Auth to use cookies
-- Password-based authentication block installed via the [Supabase UI Library](https://supabase.com/ui/docs/nextjs/password-based-auth)
-- Styling with [Tailwind CSS](https://tailwindcss.com)
-- Components with [shadcn/ui](https://ui.shadcn.com/)
-- Optional deployment with [Supabase Vercel Integration and Vercel deploy](#deploy-your-own)
-  - Environment variables automatically assigned to Vercel project
+For example, an annual-plan collection might include:
 
-## Demo
+- A sales forecast by product or customer segment
+- An income statement projection using the sales forecast
+- A cash-flow projection using the income statement
+- A balance-sheet projection that reflects the cash-flow model
 
-You can view a fully working demo at [demo-nextjs-with-supabase.vercel.app](https://demo-nextjs-with-supabase.vercel.app/).
+The goal is to preserve the logic and context behind a forecast—not just the final numbers—so it can be reviewed or shared with a consultant, lender, investor, or teammate.
 
-## Deploy to Vercel
+## Core concepts
 
-Vercel deployment will guide you through creating a Supabase account and project.
+### Collections
 
-After installation of the Supabase integration, all relevant environment variables will be assigned to the project so the deployment is fully functioning.
+A collection is the home for a connected set of projections, such as a budget, annual operating plan, acquisition model, or financing case. It makes relationships between projects visible in one workspace.
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fnext.js%2Ftree%2Fcanary%2Fexamples%2Fwith-supabase&project-name=nextjs-with-supabase&repository-name=nextjs-with-supabase&demo-title=nextjs-with-supabase&demo-description=This+starter+configures+Supabase+Auth+to+use+cookies%2C+making+the+user%27s+session+available+throughout+the+entire+Next.js+app+-+Client+Components%2C+Server+Components%2C+Route+Handlers%2C+Server+Actions+and+Middleware.&demo-url=https%3A%2F%2Fdemo-nextjs-with-supabase.vercel.app%2F&external-id=https%3A%2F%2Fgithub.com%2Fvercel%2Fnext.js%2Ftree%2Fcanary%2Fexamples%2Fwith-supabase&demo-image=https%3A%2F%2Fdemo-nextjs-with-supabase.vercel.app%2Fopengraph-image.png)
+### Projects
 
-The above will also clone the Starter kit to your GitHub, you can clone that locally and develop locally.
+A project represents one focused use case: a sales forecast, income statement, cash-flow forecast, balance sheet, or a custom model. Projects will ultimately be able to indicate which other projects they use as inputs and which models they feed.
 
-If you wish to just develop locally and not deploy to Vercel, [follow the steps below](#clone-and-run-locally).
+### Assumptions and variables
 
-## Clone and run locally
+Assumptions explain the drivers behind a projection: growth rates, headcount, prices, payment terms, or timing. They can be numbers, percentages, currency values, or text notes.
 
-1. You'll first need a Supabase project which can be made [via the Supabase dashboard](https://database.new)
+In a future iteration, reusable variables will let the same value be referenced by several projects—for example, a per-unit expense price used across a sales forecast and an expense projection.
 
-2. Create a Next.js app using the Supabase Starter template npx command
+### Versions and activity
 
-   ```bash
-   npx create-next-app --example with-supabase with-supabase-app
-   ```
+Every meaningful change should be traceable. The workspace records activity such as project creation, updates, new assumptions, and saved versions. Named versions make it possible to preserve a review-ready checkpoint before trying a new scenario.
 
-   ```bash
-   yarn create next-app --example with-supabase with-supabase-app
-   ```
+### Files
 
-   ```bash
-   pnpm create next-app --example with-supabase with-supabase-app
-   ```
+Projects will support supporting files such as source financial statements, Excel workbooks, PDFs, Word documents, and images. The intended result is a shareable, well-documented project rather than an isolated spreadsheet.
 
-3. Use `cd` to change into the app's directory
+## Current build
+
+The current application includes:
+
+- Email/password authentication through Supabase
+- A public landing page and authenticated workspace shell
+- Collections and projection projects
+- Project types for sales forecasts, income statements, balance sheets, cash flow, and general models
+- Assumptions and named version checkpoints in the application schema
+- Project activity logging
+- Profile names stored in Supabase Auth user metadata
+- Light, dark, and system appearance settings
+
+Templates, data sources, project-to-project formula links, reusable variables, file uploads, and workspace-wide activity views are planned next.
+
+## Technology
+
+- [Next.js](https://nextjs.org/) with the App Router and TypeScript
+- [React](https://react.dev/)
+- [Tailwind CSS](https://tailwindcss.com/)
+- [Supabase](https://supabase.com/) for authentication, PostgreSQL data, row-level security, and eventual file storage
+- [Vercel](https://vercel.com/) for deployment
+
+## Local setup
+
+1. Install dependencies:
 
    ```bash
-   cd with-supabase-app
+   npm install
    ```
 
-4. Rename `.env.example` to `.env.local` and update the following:
+2. Create a Supabase project and add a `.env.local` file:
 
-  ```env
-  NEXT_PUBLIC_SUPABASE_URL=[INSERT SUPABASE PROJECT URL]
-  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=[INSERT SUPABASE PROJECT API PUBLISHABLE OR ANON KEY]
-  ```
-  > [!NOTE]
-  > This example uses `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, which refers to Supabase's new **publishable** key format.
-  > Both legacy **anon** keys and new **publishable** keys can be used with this variable name during the transition period. Supabase's dashboard may show `NEXT_PUBLIC_SUPABASE_ANON_KEY`; its value can be used in this example.
-  > See the [full announcement](https://github.com/orgs/supabase/discussions/29260) for more information.
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=your-project-url
+   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+   ```
 
-  Both `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` can be found in [your Supabase project's API settings](https://supabase.com/dashboard/project/_?showConnect=true)
+3. In Supabase Dashboard, open **SQL Editor** and run the migrations in order:
 
-5. You can now run the Next.js local development server:
+   - `supabase/migrations/20260806220000_phase1_collections_projects.sql`
+   - `supabase/migrations/20260807210000_phase2_assumptions_versions.sql`
+
+   These create the application tables, indexes, activity log, and row-level security policies. Supabase Auth users are managed separately in `auth.users` when someone signs up.
+
+4. In Supabase Dashboard, add your local URL (`http://localhost:3000`) to the Auth redirect URL allow-list. Add your Vercel production URL there when you deploy.
+
+5. Start the app:
 
    ```bash
    npm run dev
    ```
 
-   The starter kit should now be running on [localhost:3000](http://localhost:3000/).
+Open [http://localhost:3000](http://localhost:3000), create an account, confirm the email, then create a collection and its first project.
 
-6. This template comes with the default shadcn/ui style initialized. If you instead want other ui.shadcn styles, delete `components.json` and [re-install shadcn/ui](https://ui.shadcn.com/docs/installation/next)
+## Useful commands
 
-> Check out [the docs for Local Development](https://supabase.com/docs/guides/getting-started/local-development) to also run Supabase locally.
+```bash
+npm run dev    # Start the local development server
+npm run lint   # Check code quality
+npm run build  # Create a production build
+```
 
-## Feedback and issues
+## Project status
 
-Please file feedback and issues over on the [Supabase GitHub org](https://github.com/supabase/supabase/issues/new/choose).
-
-## More Supabase examples
-
-- [Next.js Subscription Payments Starter](https://github.com/vercel/nextjs-subscription-payments)
-- [Cookie-based Auth and the Next.js 13 App Router (free course)](https://youtube.com/playlist?list=PL5S4mPUpp4OtMhpnp93EFSo42iQ40XjbF)
-- [Supabase Auth and the Next.js App Router](https://github.com/supabase/supabase/tree/master/examples/auth/nextjs)
+This is an actively evolving portfolio project. The focus is a thoughtfully designed, understandable foundation that can grow from individual forecasts into connected, auditable financial models.
