@@ -6,10 +6,10 @@ import { LogoutButton } from "./logout-button";
 export async function AuthButton() {
   const supabase = await createClient();
 
-  // You can also use getUser() which will be slower.
-  const { data } = await supabase.auth.getClaims();
-
-  const user = data?.claims;
+  // The header displays editable profile metadata, so use the current Auth
+  // user record. Authorization elsewhere still uses getClaims().
+  const { data } = await supabase.auth.getUser();
+  const user = data.user;
   const metadata = user?.user_metadata as
     | { first_name?: string; last_name?: string }
     | undefined;

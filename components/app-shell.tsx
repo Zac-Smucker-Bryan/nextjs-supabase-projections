@@ -7,7 +7,6 @@ import {
   FolderKanban,
   FolderOpen,
   SlidersHorizontal,
-  Wrench,
 } from "lucide-react";
 
 import { AuthButton } from "@/components/auth-button";
@@ -38,13 +37,11 @@ export function AppShell({ children, title = "Projections" }: { children: React.
       <div className="mt-auto flex items-center gap-2 border-t pt-4">
         <ThemeSwitcher />
         <span className="text-sm text-muted-foreground">Appearance</span>
-        <Link href="/developer-tools" className="ml-auto rounded-md p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground" aria-label="Developer tools" title="Developer tools"><Wrench className="size-4" /></Link>
       </div>
     </aside>
     <div className="flex min-w-0 flex-col">
       <header className="border-b border-b-foreground/10"><div className="flex h-16 w-full items-center justify-end px-5 text-sm">{!hasEnvVars ? <EnvVarWarning /> : <Suspense><AuthButton /></Suspense>}</div></header>
       <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-5 py-8">{children}</main>
-      <footer className="border-t py-8 text-center text-xs text-muted-foreground">© {new Date().getFullYear()} Zacary Smucker-Bryan</footer>
     </div>
   </div>;
 }

@@ -69,7 +69,10 @@ export default function Home() {
       </main>
 
       <footer className="border-t py-8 text-center text-xs text-muted-foreground">
-        <ThemeSwitcher />
+        <div className="flex items-center justify-center gap-3">
+          <span>© {new Date().getFullYear()} Zacary Smucker-Bryan</span>
+          <ThemeSwitcher />
+        </div>
       </footer>
     </div>
   );
