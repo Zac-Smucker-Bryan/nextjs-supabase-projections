@@ -16,7 +16,8 @@ export type Collection = {
 
 export type Project = {
   id: string;
-  collection_id: string;
+  owner_id: string;
+  collection_id: string | null;
   name: string;
   description: string | null;
   project_type: ProjectType;
@@ -57,7 +58,10 @@ export type ProjectionVersion = {
 };
 
 export type CollectionWithProjects = Collection & {
-  projects: Pick<Project, "id" | "name" | "project_type" | "updated_at">[];
+  projects: Pick<
+    Project,
+    "id" | "name" | "description" | "project_type" | "created_at" | "updated_at"
+  >[];
 };
 
 export const PROJECT_TYPE_LABELS: Record<ProjectType, string> = {

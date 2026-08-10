@@ -4,21 +4,24 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useActionDialog } from "@/components/ui/action-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createCollection } from "@/lib/actions/collections";
 
 export function CreateCollectionForm() {
+  const { close } = useActionDialog();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   return (
     <form
-      className="grid gap-4 rounded-xl border p-4"
+      className="grid gap-4"
       onSubmit={(event) => {
         event.preventDefault();
-        const formData = new FormData(event.currentTarget);
+        const form = event.currentTarget;
+        const formData = new FormData(form);
 
         startTransition(async () => {
           const result = await createCollection(formData);
@@ -28,7 +31,8 @@ export function CreateCollectionForm() {
           }
 
           setError(null);
-          event.currentTarget.reset();
+          form.reset();
+          close();
           if (result.id) {
             router.push(`/collections/${result.id}`);
           } else {

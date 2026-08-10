@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useActionDialog } from "@/components/ui/action-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createAssumption } from "@/lib/actions/assumptions";
@@ -12,13 +13,16 @@ import { ASSUMPTION_TYPE_LABELS, type AssumptionType } from "@/lib/types/databas
 const options = Object.entries(ASSUMPTION_TYPE_LABELS) as [AssumptionType, string][];
 
 export function CreateAssumptionForm({ projectId }: { projectId: string }) {
+  const { close } = useActionDialog();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [assumptionType, setAssumptionType] =
+    useState<AssumptionType>("percentage");
   const [isPending, startTransition] = useTransition();
 
   return (
     <form
-      className="grid gap-3 rounded-xl border bg-card p-4"
+      className="grid gap-3"
       onSubmit={(event) => {
         event.preventDefault();
         const form = event.currentTarget;
@@ -27,6 +31,7 @@ export function CreateAssumptionForm({ projectId }: { projectId: string }) {
           if (result.error) return setError(result.error);
           setError(null);
           form.reset();
+          close();
           router.refresh();
         });
       }}
@@ -35,14 +40,28 @@ export function CreateAssumptionForm({ projectId }: { projectId: string }) {
         <Label htmlFor="assumption-name">Assumption</Label>
         <Input id="assumption-name" name="name" placeholder="Annual growth rate" required />
       </div>
-      <div className="grid grid-cols-[1fr_120px] gap-2">
-        <div className="grid gap-2">
-          <Label htmlFor="assumption-value">Value</Label>
-          <Input id="assumption-value" name="value" placeholder="8.5" required />
-        </div>
+      <div className={assumptionType === "text" ? "grid gap-2" : "grid grid-cols-[1fr_120px] gap-2"}>
+        {assumptionType !== "text" ? (
+          <div className="grid gap-2">
+            <Label htmlFor="assumption-value">Value</Label>
+            <Input
+              id="assumption-value"
+              name="value"
+              type="text"
+              placeholder="8.5"
+              required
+            />
+          </div>
+        ) : null}
         <div className="grid gap-2">
           <Label htmlFor="assumption-type">Format</Label>
-          <select id="assumption-type" name="assumption_type" className="h-9 rounded-md border border-input bg-transparent px-2 text-sm" defaultValue="percentage">
+          <select
+            id="assumption-type"
+            name="assumption_type"
+            className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
+            value={assumptionType}
+            onChange={(event) => setAssumptionType(event.target.value as AssumptionType)}
+          >
             {options.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
         </div>

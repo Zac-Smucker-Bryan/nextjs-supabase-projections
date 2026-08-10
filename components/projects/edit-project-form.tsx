@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useActionDialog } from "@/components/ui/action-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { updateProject } from "@/lib/actions/projects";
@@ -28,13 +29,14 @@ export function EditProjectForm({
   initialDescription: string | null;
   initialProjectType: ProjectType;
 }) {
+  const { close } = useActionDialog();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   return (
     <form
-      className="grid gap-4 rounded-xl border p-4"
+      className="grid gap-4"
       onSubmit={(event) => {
         event.preventDefault();
         const formData = new FormData(event.currentTarget);
@@ -47,6 +49,7 @@ export function EditProjectForm({
           }
 
           setError(null);
+          close();
           router.refresh();
         });
       }}

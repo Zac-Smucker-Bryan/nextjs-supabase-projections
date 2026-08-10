@@ -4,7 +4,7 @@ Projections is a financial-modeling workspace for building, organizing, and expl
 
 ## The idea
 
-Financial projections rarely live in one spreadsheet tab. A sales forecast may drive revenue in an income statement, which then feeds cash flow and balance-sheet projections. This app treats each piece as its own **project**, then groups and connects related projects in a **collection** so the whole model can be understood together.
+Financial projections rarely live in one spreadsheet tab. A sales forecast may drive revenue in an income statement, which then feeds cash flow and balance-sheet projections. This app treats each piece as its own **project**. A project can stand alone while it is being developed, then be grouped and connected with related projects in a **collection**.
 
 For example, an annual-plan collection might include:
 
@@ -13,13 +13,13 @@ For example, an annual-plan collection might include:
 - A cash-flow projection using the income statement
 - A balance-sheet projection that reflects the cash-flow model
 
-The goal is to preserve the logic and context behind a forecast—not just the final numbers—so it can be reviewed or shared with a consultant, lender, investor, or teammate.
+The goal is to preserve the logic and context behind a forecast—not just the final numbers—so it can be reviewed or shared with a consultant, lender, investor, or teammate. I am not sure if this has legs as a commercial product, given that the workarounds (spreadsheets and folders) are easy, available, and powerful in their own way. But, I wanted to give organizing and connecting this information a shot.
 
 ## Core concepts
 
 ### Collections
 
-A collection is the home for a connected set of projections, such as a budget, annual operating plan, acquisition model, or financing case. It makes relationships between projects visible in one workspace.
+A collection is an optional home for a connected set of projections, such as a budget, annual operating plan, acquisition model, or financing case. It makes relationships between projects visible in one workspace without preventing someone from starting a project first.
 
 ### Projects
 
@@ -81,6 +81,7 @@ Templates, data sources, project-to-project formula links, reusable variables, f
 
    - `supabase/migrations/20260806220000_phase1_collections_projects.sql`
    - `supabase/migrations/20260807210000_phase2_assumptions_versions.sql`
+   - `supabase/migrations/20260810110000_make_projects_independent.sql`
 
    These create the application tables, indexes, activity log, and row-level security policies. Supabase Auth users are managed separately in `auth.users` when someone signs up.
 
@@ -92,7 +93,7 @@ Templates, data sources, project-to-project formula links, reusable variables, f
    npm run dev
    ```
 
-Open [http://localhost:3000](http://localhost:3000), create an account, confirm the email, then create a collection and its first project.
+Open [http://localhost:3000](http://localhost:3000), create an account, confirm the email, then create a project. You can leave it unfiled or add it to a collection.
 
 ## Useful commands
 

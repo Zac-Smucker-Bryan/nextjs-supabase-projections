@@ -36,7 +36,6 @@ export function AppShell({ children, title = "Projections" }: { children: React.
       </nav>
       <div className="mt-auto flex items-center gap-2 border-t pt-4">
         <ThemeSwitcher />
-        <span className="text-sm text-muted-foreground">Appearance</span>
       </div>
     </aside>
     <div className="flex min-w-0 flex-col">

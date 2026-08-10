@@ -11,7 +11,7 @@ export function DeleteProjectButton({
   collectionId,
 }: {
   projectId: string;
-  collectionId: string;
+  collectionId: string | null;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -33,7 +33,7 @@ export function DeleteProjectButton({
             return;
           }
 
-          router.push(`/collections/${collectionId}`);
+          router.push(collectionId ? `/collections/${collectionId}` : "/projects");
           router.refresh();
         });
       }}

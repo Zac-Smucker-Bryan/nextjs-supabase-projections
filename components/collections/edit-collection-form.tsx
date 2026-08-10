@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useActionDialog } from "@/components/ui/action-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { updateCollection } from "@/lib/actions/collections";
@@ -17,13 +18,14 @@ export function EditCollectionForm({
   initialName: string;
   initialDescription: string | null;
 }) {
+  const { close } = useActionDialog();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   return (
     <form
-      className="grid gap-4 rounded-xl border p-4"
+      className="grid gap-4"
       onSubmit={(event) => {
         event.preventDefault();
         const formData = new FormData(event.currentTarget);
@@ -36,6 +38,7 @@ export function EditCollectionForm({
           }
 
           setError(null);
+          close();
           router.refresh();
         });
       }}

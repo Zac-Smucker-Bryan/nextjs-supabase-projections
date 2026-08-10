@@ -25,7 +25,9 @@ export async function createAssumption(projectId: string, formData: FormData) {
     ? (requestedType as AssumptionType)
     : "number";
 
-  if (!name || !value) return { error: "A name and value are required." };
+  if (!name || (assumptionType !== "text" && !value)) {
+    return { error: "A name is required, and non-text assumptions need a value." };
+  }
 
   const { error } = await supabase.from("assumptions").insert({
     project_id: projectId,
@@ -41,6 +43,36 @@ export async function createAssumption(projectId: string, formData: FormData) {
     assumption_type: assumptionType,
     value,
   });
+  revalidatePath(`/projects/${projectId}`);
+  return { success: true };
+}
+
+export async function deleteAssumption(assumptionId: string, projectId: string) {
+  await requireUser();
+  const supabase = await createClient();
+
+  const { data: assumption, error: fetchError } = await supabase
+    .from("assumptions")
+    .select("name")
+    .eq("id", assumptionId)
+    .eq("project_id", projectId)
+    .single();
+
+  if (fetchError) return { error: fetchError.message };
+
+  const { error } = await supabase
+    .from("assumptions")
+    .delete()
+    .eq("id", assumptionId)
+    .eq("project_id", projectId);
+
+  if (error) return { error: error.message };
+
+  await logActivity(
+    projectId,
+    "assumption_deleted",
+    `Removed assumption “${assumption.name}”.`,
+  );
   revalidatePath(`/projects/${projectId}`);
   return { success: true };
 }
