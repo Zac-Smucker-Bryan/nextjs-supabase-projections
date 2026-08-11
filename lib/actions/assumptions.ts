@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { logActivity } from "@/lib/actions/activity";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import type { AssumptionType } from "@/lib/types/database";
+import type { AssumptionType, ProjectionAssumptionWithProject } from "@/lib/types/database";
 
 const ASSUMPTION_TYPES: AssumptionType[] = [
   "number",
@@ -13,6 +13,47 @@ const ASSUMPTION_TYPES: AssumptionType[] = [
   "currency",
   "text",
 ];
+
+export async function getAssumptions(): Promise<ProjectionAssumptionWithProject[]> {
+  await requireUser();
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("assumptions")
+    .select(
+      `
+      id,
+      project_id,
+      name,
+      value,
+      assumption_type,
+      notes,
+      created_at,
+      updated_at,
+      project:projects!inner (
+        id,
+        name
+      )
+    `,
+    )
+    .order("updated_at", { ascending: false });
+
+  if (error) throw new Error(error.message);
+
+  return (data ?? []).map((assumption) => {
+    const project = Array.isArray(assumption.project)
+      ? assumption.project[0]
+      : assumption.project;
+
+    return {
+      ...assumption,
+      project: {
+        id: project.id,
+        name: project.name,
+      },
+    };
+  }) as ProjectionAssumptionWithProject[];
+}
 
 export async function createAssumption(projectId: string, formData: FormData) {
   await requireUser();
@@ -44,6 +85,7 @@ export async function createAssumption(projectId: string, formData: FormData) {
     value,
   });
   revalidatePath(`/projects/${projectId}`);
+  revalidatePath("/assumptions");
   return { success: true };
 }
 
@@ -74,5 +116,6 @@ export async function deleteAssumption(assumptionId: string, projectId: string) 
     `Removed assumption “${assumption.name}”.`,
   );
   revalidatePath(`/projects/${projectId}`);
+  revalidatePath("/assumptions");
   return { success: true };
 }

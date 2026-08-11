@@ -100,11 +100,16 @@ export default async function ProjectPage({
         </div>
 
         <section className="space-y-8">
-          <div className="rounded-xl border border-dashed p-6 text-sm text-muted-foreground">
-            <p className="font-medium text-foreground">Projection editor</p>
-            <p className="mt-2">
-              Start with assumptions, then add line items and formulas as the next modeling layer.
+          <div className="rounded-xl border border-dashed p-6">
+            <p className="font-medium text-foreground">Projection model</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Open the dedicated workspace to set up and edit this projection at full width.
             </p>
+            <div className="mt-4">
+              <Link href={`/projects/${project.id}/projection`} className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90">
+                Open projection
+              </Link>
+            </div>
           </div>
           <section>
             <div className="mb-4 flex items-end justify-between gap-4">

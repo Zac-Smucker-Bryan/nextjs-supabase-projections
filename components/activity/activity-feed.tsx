@@ -1,6 +1,7 @@
 import { Activity } from "lucide-react";
+import Link from "next/link";
 
-import type { ActivityEvent } from "@/lib/types/database";
+import type { ActivityEvent, ActivityEventWithProject } from "@/lib/types/database";
 
 function formatDateTime(value: string) {
   return new Intl.DateTimeFormat("en-US", {
@@ -16,7 +17,11 @@ function formatEventType(eventType: string) {
   return eventType.replaceAll("_", " ");
 }
 
-export function ActivityFeed({ events }: { events: ActivityEvent[] }) {
+function hasProject(event: ActivityEvent | ActivityEventWithProject): event is ActivityEventWithProject {
+  return "project" in event;
+}
+
+export function ActivityFeed({ events }: { events: (ActivityEvent | ActivityEventWithProject)[] }) {
   if (events.length === 0) {
     return (
       <div className="rounded-xl border border-dashed p-8 text-center text-muted-foreground">
@@ -50,6 +55,11 @@ export function ActivityFeed({ events }: { events: ActivityEvent[] }) {
           <p className="mt-1 text-sm text-muted-foreground">
             {event.description}
           </p>
+          {hasProject(event) ? (
+            <Link href={`/projects/${event.project.id}`} className="mt-2 inline-flex text-xs font-medium text-primary hover:underline">
+              {event.project.name}
+            </Link>
+          ) : null}
         </li>
       ))}
     </ol>

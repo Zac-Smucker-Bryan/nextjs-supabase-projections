@@ -48,6 +48,14 @@ export type ProjectionAssumption = {
   updated_at: string;
 };
 
+export type ProjectionAssumptionWithProject = ProjectionAssumption & {
+  project: Pick<Project, "id" | "name">;
+};
+
+export type ActivityEventWithProject = ActivityEvent & {
+  project: Pick<Project, "id" | "name">;
+};
+
 export type ProjectionVersion = {
   id: string;
   project_id: string;
@@ -55,6 +63,67 @@ export type ProjectionVersion = {
   notes: string | null;
   created_by: string;
   created_at: string;
+};
+
+export type ProjectionPeriod = {
+  id: string;
+  model_id: string;
+  period_start: string;
+  period_end: string;
+  label: string;
+  granularity: "month" | "year";
+  position: number;
+};
+
+export type ProjectionModel = {
+  id: string;
+  project_id: string;
+  start_date: string;
+  horizon_years: number;
+  monthly_years: number;
+  currency_code: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ProjectionRow = {
+  id: string;
+  model_id: string;
+  parent_row_id: string | null;
+  name: string;
+  row_kind: "section" | "input" | "calculated" | "summary";
+  position: number;
+  format_bold: boolean;
+  format_fill: "muted" | "accent" | null;
+  format_gap_after: boolean;
+};
+
+export type ProjectionCell = {
+  id: string;
+  row_id: string;
+  period_id: string;
+  input_value: string | null;
+  formula_text: string | null;
+  calculated_value: string | null;
+  updated_at: string;
+};
+
+export type ProjectionRowWithCells = ProjectionRow & {
+  projection_cells: ProjectionCell[];
+};
+
+export type ProjectionModelWithGrid = ProjectionModel & {
+  projection_periods: ProjectionPeriod[];
+  projection_rows: ProjectionRowWithCells[];
+};
+
+export type AssumptionApplication = {
+  id: string;
+  assumption_id: string;
+  model_id: string;
+  row_id: string | null;
+  start_period_id: string | null;
+  end_period_id: string | null;
 };
 
 export type CollectionWithProjects = Collection & {
