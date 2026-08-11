@@ -1,6 +1,8 @@
 -- Idempotent demo seed for the manually-created Supabase Auth user demo@example.com.
 -- Run this in the Supabase SQL Editor after applying the projection schema migrations.
 -- It replaces only the Demo Cash Flow Forecast project for the demo user.
+-- This seed intentionally avoids auth.users because some SQL runners execute as the
+-- limited authenticated role. Set the demo user's first/last name manually in Auth.
 
 do $$
 declare
@@ -10,13 +12,7 @@ declare
   item record;
   inserted_id uuid;
 begin
-  if not exists (select 1 from auth.users where id = demo_user_id) then
-    raise exception 'Demo user % does not exist. Create demo@example.com in Supabase Auth first.', demo_user_id;
-  end if;
-
-  update auth.users
-  set raw_user_meta_data = coalesce(raw_user_meta_data, '{}'::jsonb) || '{"first_name":"Demo","last_name":"User"}'::jsonb
-  where id = demo_user_id;
+  perform set_config('request.jwt.claim.sub', demo_user_id::text, true);
 
   delete from public.projects
   where owner_id = demo_user_id
@@ -76,10 +72,10 @@ begin
 
   for item in
     select * from jsonb_to_recordset($assumptions$[{"name":"Linked Herd Model","type":"text","value":"","notes":"Rows such as Livestock income and Feed use cached values from workbook formulas linked to the missing [1]Herd Model sheet."},{"name":"Linked Debt Schedule","type":"text","value":"","notes":"Loan proceeds and principal/interest payments use cached values from workbook formulas linked to the missing [1]Debt Schedule sheet."},{"name":"Linked Capex Schedule","type":"text","value":"","notes":"Capital purchases and deferred maintenance use cached values from workbook formulas linked to the missing [1]Capex sheet."},{"name":"Linked Labor Schedule","type":"text","value":"","notes":"Labor hired values use cached values from workbook formulas linked to the missing [1]Labor Schedule sheet."},{"name":"Linked Pasture Model","type":"text","value":"","notes":"Custom hire and seed/plant values use cached values from workbook formulas linked to the missing [1]Pasture Model sheet."},{"name":"Linked Phosphorous Credit Schedule","type":"text","value":"","notes":"Phosphorous credit values use cached values from workbook formulas linked to the missing [1]CIG&Phos sheet."},{"name":"Annual escalation rate","type":"percentage","value":"5","notes":"Obvious 5% annual escalation used by rows such as Insurance, Utilities, Professional fees, Feed, and Property taxes & Insurance."},{"name":"Off-farm hourly rate","type":"currency","value":"26","notes":"Workbook uses 26 * 4 * 30 for monthly off-farm income."},{"name":"Off-farm weeks per month","type":"number","value":"4","notes":"Workbook uses 26 * 4 * 30 for monthly off-farm income."},{"name":"Off-farm hours per week","type":"number","value":"30","notes":"Workbook uses 26 * 4 * 30 for monthly off-farm income."}]$assumptions$::jsonb)
-      as a(name text, assumption_type text, value text, notes text)
+      as a(name text, type text, value text, notes text)
   loop
     insert into public.assumptions (project_id, name, value, assumption_type, notes)
-    values (demo_project_id, item.name, item.value, item.assumption_type, item.notes);
+    values (demo_project_id, item.name, item.value, item.type, item.notes);
   end loop;
 
   insert into public.activity_events (project_id, user_id, event_type, description, metadata)

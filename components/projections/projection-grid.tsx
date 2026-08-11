@@ -15,6 +15,7 @@ import type {
 
 type CellKey = `${string}:${string}`;
 type Selection = { rowId: string; periodId: string };
+type ReferenceResolver = Record<string, number> | ((reference: string) => number | undefined);
 
 function cellKey(rowId: string, periodId: string): CellKey {
   return `${rowId}:${periodId}`;
@@ -57,16 +58,22 @@ function periodEmphasis(period: ProjectionPeriod) {
     : "border-l-2 border-foreground/20 bg-muted/20 font-bold";
 }
 
+function resolveReference(referenceValues: ReferenceResolver, reference: string) {
+  return typeof referenceValues === "function"
+    ? referenceValues(reference)
+    : referenceValues[reference.toLowerCase()];
+}
+
 // This deliberately supports only arithmetic and named @assumption references.
 // Keeping the grammar narrow avoids executing formulas as JavaScript in the browser.
 function calculateFormula(
   formula: string,
   assumptionValues: Record<string, number>,
-  referenceValues: Record<string, number>,
+  referenceValues: ReferenceResolver,
 ) {
   let expression = formula.slice(1)
     .replace(/\[([^\]]+)\]/g, (_, reference: string) => {
-      const value = referenceValues[reference.toLowerCase()];
+      const value = resolveReference(referenceValues, reference);
       return value === undefined ? "NaN" : String(value);
     })
     .replace(/@\{([^}]+)\}/g, (_, name: string) => {
@@ -179,34 +186,56 @@ export function ProjectionGrid({
   }, [model]);
   const referenceValues = useMemo(() => {
     const references: Record<string, number> = {};
+    const cachedResults = new Map<CellKey, number | null>();
     const evaluating = new Set<CellKey>();
+    const referenceTargets = new Map<string, { row: ProjectionRowWithCells; period: ProjectionPeriod }>();
+    const monthlyPeriodsByYear = new Map<number, ProjectionPeriod[]>();
+
+    model.projection_periods.forEach((period) => {
+      if (period.granularity !== "month") return;
+      const year = periodYear(period);
+      monthlyPeriodsByYear.set(year, [...(monthlyPeriodsByYear.get(year) ?? []), period]);
+    });
+    model.projection_rows.forEach((row) => model.projection_periods.forEach((period) => {
+      referenceTargets.set(`${row.name} ${period.label}`.toLowerCase(), { row, period });
+    }));
+
     const calculateCell = (row: ProjectionRowWithCells, period: ProjectionPeriod): number | null => {
+      const key = cellKey(row.id, period.id);
+      if (cachedResults.has(key)) return cachedResults.get(key) ?? null;
+
       if (isSummaryPeriod(period)) {
-        return model.projection_periods
-          .filter((candidate) => candidate.granularity === "month" && periodYear(candidate) === periodYear(period))
-          .reduce((total, monthPeriod) => {
+        const total = (monthlyPeriodsByYear.get(periodYear(period)) ?? [])
+          .reduce((sum, monthPeriod) => {
             const result = calculateCell(row, monthPeriod);
-            return result === null ? total : total + result;
+            return result === null ? sum : sum + result;
           }, 0);
+        cachedResults.set(key, total);
+        return total;
       }
 
-      const key = cellKey(row.id, period.id);
       if (evaluating.has(key)) return null;
       const stored = cellValues[key];
       const currentValue = stringValue(drafts[key] ?? stored?.formula ?? stored?.value);
-      if (!currentValue) return 0;
+      if (!currentValue) {
+        cachedResults.set(key, 0);
+        return 0;
+      }
       if (!currentValue.trimStart().startsWith("=")) {
         const numeric = Number(currentValue);
-        return Number.isFinite(numeric) ? numeric : null;
+        const result = Number.isFinite(numeric) ? numeric : null;
+        cachedResults.set(key, result);
+        return result;
       }
       evaluating.add(key);
-      const lookup: Record<string, number> = {};
-      model.projection_rows.forEach((referenceRow) => model.projection_periods.forEach((referencePeriod) => {
-        const result = calculateCell(referenceRow, referencePeriod);
-        if (result !== null) lookup[`${referenceRow.name} ${referencePeriod.label}`.toLowerCase()] = result;
-      }));
-      const calculated = calculateFormula(currentValue.trimStart(), assumptionValues, lookup);
+      const calculated = calculateFormula(currentValue.trimStart(), assumptionValues, (reference) => {
+        const target = referenceTargets.get(reference.toLowerCase());
+        if (!target) return undefined;
+        const result = calculateCell(target.row, target.period);
+        return result === null ? undefined : result;
+      });
       evaluating.delete(key);
+      cachedResults.set(key, calculated);
       return calculated;
     };
     model.projection_rows.forEach((row) => model.projection_periods.forEach((period) => {

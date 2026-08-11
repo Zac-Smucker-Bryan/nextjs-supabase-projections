@@ -5,7 +5,13 @@ import { revalidatePath } from "next/cache";
 import { logActivity } from "@/lib/actions/activity";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import type { ProjectionModelWithGrid } from "@/lib/types/database";
+import type {
+  ProjectionCell,
+  ProjectionModel,
+  ProjectionModelWithGrid,
+  ProjectionPeriod,
+  ProjectionRow,
+} from "@/lib/types/database";
 
 function buildPeriods(startDate: string, horizonYears: number, monthlyYears = 1) {
   const start = new Date(`${startDate}T00:00:00`);
@@ -106,25 +112,54 @@ export async function createProjectionModel(projectId: string, formData: FormDat
 export async function getProjectionModel(projectId: string): Promise<ProjectionModelWithGrid | null> {
   await requireUser();
   const supabase = await createClient();
-  const { data, error } = await supabase
+  const { data: model, error } = await supabase
     .from("projection_models")
-    .select("*, projection_periods(*), projection_rows(*, projection_cells(*))")
+    .select("*")
     .eq("project_id", projectId)
     .maybeSingle();
 
   if (error) throw new Error(error.message);
-  if (!data) return null;
+  if (!model) return null;
 
-  const model = data as unknown as ProjectionModelWithGrid;
+  const [{ data: periods, error: periodsError }, { data: rows, error: rowsError }] = await Promise.all([
+    supabase
+      .from("projection_periods")
+      .select("*")
+      .eq("model_id", model.id)
+      .order("position", { ascending: true }),
+    supabase
+      .from("projection_rows")
+      .select("*")
+      .eq("model_id", model.id)
+      .order("position", { ascending: true }),
+  ]);
+
+  if (periodsError) throw new Error(periodsError.message);
+  if (rowsError) throw new Error(rowsError.message);
+
+  const typedRows = (rows ?? []) as ProjectionRow[];
+  const rowIds = typedRows.map((row) => row.id);
+  const { data: cells, error: cellsError } = rowIds.length
+    ? await supabase
+      .from("projection_cells")
+      .select("*")
+      .in("row_id", rowIds)
+    : { data: [], error: null };
+
+  if (cellsError) throw new Error(cellsError.message);
+
+  const cellsByRow = ((cells ?? []) as ProjectionCell[]).reduce<Record<string, ProjectionCell[]>>((grouped, cell) => {
+    grouped[cell.row_id] = [...(grouped[cell.row_id] ?? []), cell];
+    return grouped;
+  }, {});
+
   return {
-    ...model,
-    projection_periods: [...(model.projection_periods ?? [])].sort((a, b) => a.position - b.position),
-    projection_rows: [...(model.projection_rows ?? [])]
-      .sort((a, b) => a.position - b.position)
-      .map((row) => ({
-        ...row,
-        projection_cells: [...(row.projection_cells ?? [])],
-      })),
+    ...(model as ProjectionModel),
+    projection_periods: (periods ?? []) as ProjectionPeriod[],
+    projection_rows: typedRows.map((row) => ({
+      ...row,
+      projection_cells: cellsByRow[row.id] ?? [],
+    })),
   };
 }
 
