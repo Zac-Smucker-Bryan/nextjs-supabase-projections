@@ -44,6 +44,10 @@ function stringValue(value: unknown) {
   return typeof value === "string" ? value : value == null ? "" : String(value);
 }
 
+function isFormulaStart(value: string) {
+  return value.trim() === "=";
+}
+
 function periodYear(period: ProjectionPeriod) {
   return new Date(`${period.period_start}T00:00:00`).getUTCFullYear();
 }
@@ -53,9 +57,9 @@ function isSummaryPeriod(period: ProjectionPeriod) {
 }
 
 function periodEmphasis(period: ProjectionPeriod) {
-  return period.granularity === "month"
-    ? "border-l"
-    : "border-l-2 border-foreground/20 bg-muted/20 font-bold";
+  if (period.granularity === "month") return "border-l";
+  if (isSummaryPeriod(period)) return "border-l-2 border-foreground/20 bg-muted font-bold";
+  return "border-l-2 border-foreground/20 font-bold";
 }
 
 function resolveReference(referenceValues: ReferenceResolver, reference: string) {
@@ -140,6 +144,7 @@ function formatValue(
   references: Record<string, number>,
 ) {
   if (formula) {
+    if (isFormulaStart(formula)) return "";
     const calculated = calculateFormula(formula, assumptions, references);
     return calculated === null ? "#ERROR" : new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(calculated);
   }
@@ -169,7 +174,7 @@ export function ProjectionGrid({
   const [formulaBarFocused, setFormulaBarFocused] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const cellRefs = useRef<Record<CellKey, HTMLInputElement | null>>({});
+  const cellRefs = useRef<Record<CellKey, HTMLElement | null>>({});
   const rowLabelRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const formulaBarRef = useRef<HTMLInputElement>(null);
   const formulaCaret = useRef(0);
@@ -269,8 +274,9 @@ export function ProjectionGrid({
   }
 
   function persistCell(rowId: string, periodId: string, value: string) {
+    const savedValue = isFormulaStart(value) ? "" : value;
     startTransition(async () => {
-      const result = await saveProjectionCell(projectId, rowId, periodId, value);
+      const result = await saveProjectionCell(projectId, rowId, periodId, savedValue);
       if (result.error) return setError(result.error);
       setError(null);
       setDrafts((current) => {
@@ -309,6 +315,22 @@ export function ProjectionGrid({
     if (!row || !period) return false;
     cellRefs.current[cellKey(row.id, period.id)]?.focus();
     return true;
+  }
+
+  function moveFromSelection(rowOffset: number, periodOffset: number) {
+    if (!selection) return false;
+    const rowIndex = inputRows.findIndex((row) => row.id === selection.rowId);
+    const periodIndex = model.projection_periods.findIndex((period) => period.id === selection.periodId);
+    if (rowIndex < 0 || periodIndex < 0) return false;
+    return focusCell(rowIndex + rowOffset, periodIndex + periodOffset);
+  }
+
+  function commitFormulaBar(value: string, rowOffset: number, periodOffset: number) {
+    if (!selection) return;
+    persistCell(selection.rowId, selection.periodId, value);
+    requestAnimationFrame(() => {
+      if (!moveFromSelection(rowOffset, periodOffset)) clearSelection();
+    });
   }
 
   function focusRowLabel(rowIndex: number) {
@@ -396,9 +418,10 @@ export function ProjectionGrid({
       const display = formatValue(String(referenceValues[reference] ?? 0), null, assumptionValues, referenceValues);
       return (
         <button
+          ref={(element) => { cellRefs.current[key] = element; }}
           type="button"
-          aria-label={`${row.name} ${period.label}${isSelected ? ", active cell" : ""}`}
-          className={`flex h-11 w-full min-w-[2.875rem] items-center justify-end px-1 text-right font-mono text-sm font-bold outline-none focus:ring-2 focus:ring-inset focus:ring-primary ${periodEmphasis(period)} ${isSelected ? "bg-primary/10 ring-2 ring-inset ring-primary" : ""}`}
+          aria-label={`${row.name} ${period.label}, calculated total${isSelected ? ", active cell" : ""}`}
+          className={`flex h-11 w-full min-w-[2.875rem] cursor-default items-center justify-end px-1 text-right font-mono text-sm font-bold outline-none focus:ring-2 focus:ring-inset focus:ring-primary ${periodEmphasis(period)} ${isSelected ? "bg-primary/10 ring-2 ring-inset ring-primary" : ""}`}
           onMouseDown={(event) => {
             if (selection && !isSelected && formulaBarFocused && formulaValue.trimStart().startsWith("=")) {
               event.preventDefault();
@@ -458,9 +481,20 @@ export function ProjectionGrid({
           setSelection({ rowId: row.id, periodId: period.id });
           setEditingCell(key);
         }}
-        onChange={(event) => setCellDraft(row.id, period.id, event.target.value)}
+        onChange={(event) => {
+          const nextValue = event.target.value;
+          setCellDraft(row.id, period.id, nextValue);
+          if (isFormulaStart(nextValue)) {
+            formulaCaret.current = nextValue.length;
+            requestAnimationFrame(() => {
+              formulaBarRef.current?.focus();
+              formulaBarRef.current?.setSelectionRange(nextValue.length, nextValue.length);
+            });
+          }
+        }}
         onBlur={(event) => {
           setEditingCell(null);
+          if (isFormulaStart(event.target.value) && event.relatedTarget === formulaBarRef.current) return;
           persistCell(row.id, period.id, event.target.value);
         }}
         onKeyDown={(event) => {
@@ -485,7 +519,7 @@ export function ProjectionGrid({
             if (!focusCell(rowIndex + 1, periodIndex)) clearSelection();
           }
         }}
-        className={`h-11 w-full min-w-[2.875rem] px-1 text-right font-mono text-sm outline-none focus:ring-2 focus:ring-inset focus:ring-primary ${row.format_bold || period.granularity === "year" ? "font-bold" : ""} ${periodEmphasis(period)} ${isSelected ? "bg-primary/10 ring-2 ring-inset ring-primary" : "bg-transparent"}`}
+        className={`h-11 w-full min-w-[2.875rem] cursor-text px-1 text-right font-mono text-sm outline-none hover:bg-background focus:bg-background focus:ring-2 focus:ring-inset focus:ring-primary ${row.format_bold || period.granularity === "year" ? "font-bold" : ""} ${periodEmphasis(period)} ${isSelected ? "bg-primary/10 ring-2 ring-inset ring-primary" : "bg-transparent"}`}
       />
     );
   }
@@ -508,7 +542,7 @@ export function ProjectionGrid({
 
   return (
     <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border bg-card shadow-sm">
-      <div className="shrink-0 border-b bg-muted/30 p-4">
+      <div className="relative z-50 shrink-0 border-b bg-card p-4">
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded border bg-background px-2 py-1 font-mono text-sm text-muted-foreground">
             {selectedReference}
@@ -533,9 +567,23 @@ export function ProjectionGrid({
               }}
               onSelect={(event) => { formulaCaret.current = event.currentTarget.selectionStart ?? formulaValue.length; }}
               onKeyUp={(event) => { formulaCaret.current = event.currentTarget.selectionStart ?? formulaValue.length; }}
-              onBlur={() => setFormulaBarFocused(false)}
+              onBlur={(event) => {
+                setFormulaBarFocused(false);
+                if (selection && isFormulaStart(event.currentTarget.value)) {
+                  setCellDraft(selection.rowId, selection.periodId, "");
+                  persistCell(selection.rowId, selection.periodId, "");
+                }
+              }}
               onKeyDown={(event) => {
-                if (event.key === "Enter" && selection) persistCell(selection.rowId, selection.periodId, event.currentTarget.value);
+                if (!selection) return;
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  commitFormulaBar(event.currentTarget.value, 1, 0);
+                }
+                if (event.key === "Tab") {
+                  event.preventDefault();
+                  commitFormulaBar(event.currentTarget.value, 0, event.shiftKey ? -1 : 1);
+                }
               }}
             />
             {typedAssumption !== undefined ? (
@@ -564,7 +612,7 @@ export function ProjectionGrid({
       <div className="flex-1 overflow-auto">
         <div className="min-w-max">
           <div
-            className="sticky top-0 z-30 grid border-b bg-muted/40 text-xs font-medium text-muted-foreground"
+            className="sticky top-0 z-30 grid border-b bg-muted text-xs font-medium text-muted-foreground"
             style={{ gridTemplateColumns }}
           >
             <div className="sticky left-0 z-40 bg-muted p-3 shadow-[4px_0_8px_-8px_currentColor]">
