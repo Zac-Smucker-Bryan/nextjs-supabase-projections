@@ -18,10 +18,12 @@ function buildPeriods(startDate: string, horizonYears: number, monthlyYears = 1)
     position: number;
   }[] = [];
   let position = 0;
+  const monthlyYearEnds = new Set<number>();
 
   for (let monthOffset = 0; monthOffset < (12 - start.getUTCMonth()) + 12 * (monthlyYears - 1); monthOffset += 1) {
     const periodStart = new Date(Date.UTC(startYear, start.getUTCMonth() + monthOffset, 1));
     const periodEnd = new Date(Date.UTC(periodStart.getUTCFullYear(), periodStart.getUTCMonth() + 1, 0));
+    const periodYear = periodStart.getUTCFullYear();
     periods.push({
       period_start: periodStart.toISOString().slice(0, 10),
       period_end: periodEnd.toISOString().slice(0, 10),
@@ -33,9 +35,20 @@ function buildPeriods(startDate: string, horizonYears: number, monthlyYears = 1)
       granularity: "month",
       position: position++,
     });
+    if (periodStart.getUTCMonth() === 11) {
+      monthlyYearEnds.add(periodYear);
+      periods.push({
+        period_start: `${periodYear}-12-31`,
+        period_end: `${periodYear}-12-31`,
+        label: `${periodYear} Total`,
+        granularity: "year",
+        position: position++,
+      });
+    }
   }
 
   for (let year = startYear + monthlyYears; year < startYear + horizonYears; year += 1) {
+    if (monthlyYearEnds.has(year)) continue;
     periods.push({
       period_start: `${year}-01-01`,
       period_end: `${year}-12-31`,

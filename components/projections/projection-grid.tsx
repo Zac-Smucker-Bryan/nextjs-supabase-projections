@@ -43,6 +43,20 @@ function stringValue(value: unknown) {
   return typeof value === "string" ? value : value == null ? "" : String(value);
 }
 
+function periodYear(period: ProjectionPeriod) {
+  return new Date(`${period.period_start}T00:00:00`).getUTCFullYear();
+}
+
+function isSummaryPeriod(period: ProjectionPeriod) {
+  return period.label.endsWith(" Total");
+}
+
+function periodEmphasis(period: ProjectionPeriod) {
+  return period.granularity === "month"
+    ? "border-l"
+    : "border-l-2 border-foreground/20 bg-muted/20 font-bold";
+}
+
 // This deliberately supports only arithmetic and named @assumption references.
 // Keeping the grammar narrow avoids executing formulas as JavaScript in the browser.
 function calculateFormula(
@@ -50,7 +64,7 @@ function calculateFormula(
   assumptionValues: Record<string, number>,
   referenceValues: Record<string, number>,
 ) {
-  const expression = formula.slice(1)
+  let expression = formula.slice(1)
     .replace(/\[([^\]]+)\]/g, (_, reference: string) => {
       const value = referenceValues[reference.toLowerCase()];
       return value === undefined ? "NaN" : String(value);
@@ -62,6 +76,13 @@ function calculateFormula(
     .replace(/@([a-zA-Z0-9_]+)/g, (_, name: string) => {
     const value = assumptionValues[name.toLowerCase()];
     return value === undefined ? "NaN" : String(value);
+  });
+  expression = expression.replace(/SUM\(([^()]+)\)/gi, (_, rawArgs: string) => {
+    const total = rawArgs.split(",").reduce((sum, rawArg) => {
+      const value = Number(rawArg.trim());
+      return Number.isFinite(value) ? sum + value : NaN;
+    }, 0);
+    return Number.isFinite(total) ? String(total) : "NaN";
   });
   const compact = expression.replace(/\s+/g, "");
   const tokens = compact.match(/\d*\.\d+|\d+|[()+\-*/]/g);
@@ -160,6 +181,15 @@ export function ProjectionGrid({
     const references: Record<string, number> = {};
     const evaluating = new Set<CellKey>();
     const calculateCell = (row: ProjectionRowWithCells, period: ProjectionPeriod): number | null => {
+      if (isSummaryPeriod(period)) {
+        return model.projection_periods
+          .filter((candidate) => candidate.granularity === "month" && periodYear(candidate) === periodYear(period))
+          .reduce((total, monthPeriod) => {
+            const result = calculateCell(row, monthPeriod);
+            return result === null ? total : total + result;
+          }, 0);
+      }
+
       const key = cellKey(row.id, period.id);
       if (evaluating.has(key)) return null;
       const stored = cellValues[key];
@@ -315,8 +345,65 @@ export function ProjectionGrid({
     saveRowEdit();
   }
 
+  function handleRowEditKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      saveRowEdit();
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setEditingRow(null);
+    }
+  }
+
   function inputForCell(row: ProjectionRowWithCells, period: ProjectionPeriod) {
     const key = cellKey(row.id, period.id);
+    const isSelected = selectedKey === key;
+    const rowIndex = inputRows.findIndex((inputRow) => inputRow.id === row.id);
+    const periodIndex = model.projection_periods.findIndex((projectionPeriod) => projectionPeriod.id === period.id);
+
+    if (isSummaryPeriod(period)) {
+      const reference = `${row.name} ${period.label}`.toLowerCase();
+      const display = formatValue(String(referenceValues[reference] ?? 0), null, assumptionValues, referenceValues);
+      return (
+        <button
+          type="button"
+          aria-label={`${row.name} ${period.label}${isSelected ? ", active cell" : ""}`}
+          className={`flex h-11 w-full min-w-[2.875rem] items-center justify-end px-1 text-right font-mono text-sm font-bold outline-none focus:ring-2 focus:ring-inset focus:ring-primary ${periodEmphasis(period)} ${isSelected ? "bg-primary/10 ring-2 ring-inset ring-primary" : ""}`}
+          onMouseDown={(event) => {
+            if (selection && !isSelected && formulaBarFocused && formulaValue.trimStart().startsWith("=")) {
+              event.preventDefault();
+              insertReference(row, period);
+            }
+          }}
+          onFocus={() => {
+            setSelection({ rowId: row.id, periodId: period.id });
+            setEditingCell(null);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === "ArrowDown") {
+              event.preventDefault();
+              if (!focusCell(rowIndex + 1, periodIndex)) clearSelection();
+            }
+            if (event.key === "ArrowLeft") {
+              event.preventDefault();
+              if (!focusCell(rowIndex, periodIndex - 1)) rowLabelRefs.current[row.id]?.focus();
+            }
+            if (event.key === "ArrowRight") {
+              event.preventDefault();
+              if (!focusCell(rowIndex, periodIndex + 1)) clearSelection();
+            }
+            if (event.key === "ArrowUp") {
+              event.preventDefault();
+              if (!focusCell(rowIndex - 1, periodIndex)) clearSelection();
+            }
+          }}
+        >
+          {display}
+        </button>
+      );
+    }
+
     const stored = cellValues[key];
     const draft = drafts[key];
     const value = stringValue(draft ?? stored?.formula ?? stored?.value);
@@ -327,9 +414,6 @@ export function ProjectionGrid({
       assumptionValues,
       referenceValues,
     );
-    const isSelected = selectedKey === key;
-    const rowIndex = inputRows.findIndex((inputRow) => inputRow.id === row.id);
-    const periodIndex = model.projection_periods.findIndex((projectionPeriod) => projectionPeriod.id === period.id);
     return (
       <input
         ref={(element) => { cellRefs.current[key] = element; }}
@@ -372,7 +456,7 @@ export function ProjectionGrid({
             if (!focusCell(rowIndex + 1, periodIndex)) clearSelection();
           }
         }}
-        className={`h-11 w-full min-w-[2.875rem] px-1 text-right font-mono text-sm outline-none focus:ring-2 focus:ring-inset focus:ring-primary ${row.format_bold ? "font-bold" : ""} ${period.granularity === "year" ? "border-l-2 border-foreground/15" : "border-l"} ${isSelected ? "bg-primary/10 ring-2 ring-inset ring-primary" : "bg-transparent"}`}
+        className={`h-11 w-full min-w-[2.875rem] px-1 text-right font-mono text-sm outline-none focus:ring-2 focus:ring-inset focus:ring-primary ${row.format_bold || period.granularity === "year" ? "font-bold" : ""} ${periodEmphasis(period)} ${isSelected ? "bg-primary/10 ring-2 ring-inset ring-primary" : "bg-transparent"}`}
       />
     );
   }
@@ -459,7 +543,7 @@ export function ProjectionGrid({
             </div>
             {model.projection_periods.map((period, index) => (
               <div
-                className={`${period.granularity === "year" ? "border-l-2 border-foreground/15" : "border-l"} group relative bg-muted/40 p-3 text-right`}
+                className={`${periodEmphasis(period)} group relative p-3 text-right`}
                 key={period.id}
               >
                 {period.label}
@@ -469,20 +553,20 @@ export function ProjectionGrid({
           </div>
           {model.projection_rows.map((row, rowIndex) => row.row_kind === "section" ? (
             <div
-              className={`group relative grid border-b bg-muted/50 text-xs font-semibold uppercase tracking-wide text-muted-foreground ${model.projection_rows[rowIndex - 1]?.format_gap_after ?? false ? "border-t" : ""} ${row.format_gap_after ?? false ? "mb-3" : ""}`}
+              className={`group relative mb-3 grid bg-background text-[1.2em] font-bold text-foreground ${model.projection_rows[rowIndex - 1]?.format_gap_after ?? false ? "border-t" : ""}`}
               key={row.id}
               style={{ gridTemplateColumns }}
             >
-              <div className={`sticky left-0 z-20 flex items-center bg-muted px-3 py-2 shadow-[4px_0_8px_-8px_currentColor] hover:z-40 focus-within:z-40 group-hover:z-40 ${editingRow?.id === row.id ? "pl-9" : ""}`}>
-                {editingRow?.id === row.id ? <div className="flex w-full items-center gap-2 normal-case" onBlur={handleRowEditBlur}><Input autoFocus value={editingRow.name} onChange={(event) => setEditingRow({ ...editingRow, name: event.target.value })} onKeyDown={(event) => { if (event.key === "Enter") saveRowEdit(); if (event.key === "Escape") setEditingRow(null); }} className="h-8 min-w-0 flex-1" /><button type="button" className={`rounded px-1 ${editingRow.bold ? "bg-foreground text-background" : ""}`} onClick={() => setEditingRow({ ...editingRow, bold: !editingRow.bold })}>B</button><label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={editingRow.gapAfter ?? false} onChange={(event) => setEditingRow({ ...editingRow, gapAfter: event.target.checked })} />Gap</label></div> : <button ref={(element) => { rowLabelRefs.current[row.id] = element; }} type="button" className="min-w-0 flex-1 truncate text-left" onKeyDown={(event) => handleRowLabelKeyDown(event, row)} onClick={() => setEditingRow({ id: row.id, name: row.name, bold: row.format_bold, gapAfter: row.format_gap_after ?? false })}>{row.name}</button>}
+              <div className={`sticky left-0 z-20 flex items-center bg-background px-3 py-3 shadow-[4px_0_8px_-8px_currentColor] hover:z-40 focus-within:z-40 group-hover:z-40 ${editingRow?.id === row.id ? "pl-9" : ""}`}>
+                {editingRow?.id === row.id ? <div className="flex w-full items-center gap-2 normal-case" onBlur={handleRowEditBlur} onKeyDown={handleRowEditKeyDown}><Input autoFocus value={editingRow.name} onChange={(event) => setEditingRow({ ...editingRow, name: event.target.value })} className="h-8 min-w-0 flex-1" /><button type="button" className={`rounded px-1 ${editingRow.bold ? "bg-foreground text-background" : ""}`} onClick={() => setEditingRow({ ...editingRow, bold: !editingRow.bold })}>B</button><label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={editingRow.gapAfter ?? false} onChange={(event) => setEditingRow({ ...editingRow, gapAfter: event.target.checked })} />Gap</label></div> : <button ref={(element) => { rowLabelRefs.current[row.id] = element; }} type="button" className="min-w-0 flex-1 truncate text-left" onKeyDown={(event) => handleRowLabelKeyDown(event, row)} onClick={() => setEditingRow({ id: row.id, name: row.name, bold: row.format_bold, gapAfter: row.format_gap_after ?? false })}>{row.name}</button>}
                 {editingRow?.id === row.id ? deleteRowButton(row) : null}
                 <button type="button" aria-label={`Add row below ${row.name}`} className="absolute -bottom-3 left-0 z-50 h-6 w-full opacity-0 hover:opacity-100 focus:opacity-100" onClick={() => insertRow(row, "below")}><span className="absolute left-0 right-0 top-1/2 border-t border-green-600" /><span className="absolute left-1/2 top-1/2 grid size-6 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-green-600 text-sm text-white shadow-sm">+</span></button>
               </div>
-              <div className="bg-muted/50" style={{ gridColumn: "2 / -1" }} />
+              <div className="bg-background" style={{ gridColumn: "2 / -1" }} />
             </div>
           ) : (
             <div className={`grid border-b ${model.projection_rows[rowIndex - 1]?.format_gap_after ?? false ? "border-t" : ""} ${row.format_gap_after ?? false ? "mb-3" : ""} ${row.format_fill === "muted" ? "bg-muted/40" : row.format_fill === "accent" ? "bg-primary/10" : ""}`} key={row.id} style={{ gridTemplateColumns }}>
-              <div className={`group relative sticky left-0 z-20 flex items-center px-3 py-0 text-sm shadow-[4px_0_8px_-8px_currentColor] hover:z-40 focus-within:z-40 ${editingRow?.id === row.id ? "pl-9" : ""} ${row.format_fill === "muted" ? "bg-muted" : row.format_fill === "accent" ? "bg-primary/10" : "bg-card"} ${row.format_bold ? "font-bold" : "font-medium"}`}>{editingRow?.id === row.id ? <div className="flex w-full items-center gap-2" onBlur={handleRowEditBlur}><Input autoFocus value={editingRow.name} onChange={(event) => setEditingRow({ ...editingRow, name: event.target.value })} onKeyDown={(event) => { if (event.key === "Enter") saveRowEdit(); if (event.key === "Escape") setEditingRow(null); }} className="h-8 min-w-0 flex-1" /><button type="button" className={`rounded px-1 ${editingRow.bold ? "bg-foreground text-background" : ""}`} onClick={() => setEditingRow({ ...editingRow, bold: !editingRow.bold })}>B</button><label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={editingRow.gapAfter ?? false} onChange={(event) => setEditingRow({ ...editingRow, gapAfter: event.target.checked })} />Gap</label></div> : <button ref={(element) => { rowLabelRefs.current[row.id] = element; }} type="button" className="min-w-0 flex-1 truncate text-left" onKeyDown={(event) => handleRowLabelKeyDown(event, row)} onClick={() => setEditingRow({ id: row.id, name: row.name, bold: row.format_bold, gapAfter: row.format_gap_after ?? false })}>{row.name}</button>}{editingRow?.id === row.id ? deleteRowButton(row) : null}<button type="button" aria-label={`Add row below ${row.name}`} className="absolute -bottom-3 left-0 z-50 h-6 w-full opacity-0 hover:opacity-100 focus:opacity-100" onClick={() => insertRow(row, "below")}><span className="absolute left-0 right-0 top-1/2 border-t border-green-600" /><span className="absolute left-1/2 top-1/2 grid size-6 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-green-600 text-sm text-white shadow-sm">+</span></button></div>
+              <div className={`group relative sticky left-0 z-20 flex items-center px-3 py-0 text-sm shadow-[4px_0_8px_-8px_currentColor] hover:z-40 focus-within:z-40 ${editingRow?.id === row.id ? "pl-9" : ""} ${row.format_fill === "muted" ? "bg-muted" : row.format_fill === "accent" ? "bg-primary/10" : "bg-card"} ${row.format_bold ? "font-bold" : "font-medium"}`}>{editingRow?.id === row.id ? <div className="flex w-full items-center gap-2" onBlur={handleRowEditBlur} onKeyDown={handleRowEditKeyDown}><Input autoFocus value={editingRow.name} onChange={(event) => setEditingRow({ ...editingRow, name: event.target.value })} className="h-8 min-w-0 flex-1" /><button type="button" className={`rounded px-1 ${editingRow.bold ? "bg-foreground text-background" : ""}`} onClick={() => setEditingRow({ ...editingRow, bold: !editingRow.bold })}>B</button><label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={editingRow.gapAfter ?? false} onChange={(event) => setEditingRow({ ...editingRow, gapAfter: event.target.checked })} />Gap</label></div> : <button ref={(element) => { rowLabelRefs.current[row.id] = element; }} type="button" className="min-w-0 flex-1 truncate text-left" onKeyDown={(event) => handleRowLabelKeyDown(event, row)} onClick={() => setEditingRow({ id: row.id, name: row.name, bold: row.format_bold, gapAfter: row.format_gap_after ?? false })}>{row.name}</button>}{editingRow?.id === row.id ? deleteRowButton(row) : null}<button type="button" aria-label={`Add row below ${row.name}`} className="absolute -bottom-3 left-0 z-50 h-6 w-full opacity-0 hover:opacity-100 focus:opacity-100" onClick={() => insertRow(row, "below")}><span className="absolute left-0 right-0 top-1/2 border-t border-green-600" /><span className="absolute left-1/2 top-1/2 grid size-6 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-green-600 text-sm text-white shadow-sm">+</span></button></div>
               {model.projection_periods.map((period) => <div key={period.id}>{inputForCell(row, period)}</div>)}
             </div>
           ))}
@@ -504,8 +588,8 @@ export function ProjectionGrid({
           });
         }}
       >
-        <Input value={newRowName} onChange={(event) => setNewRowName(event.target.value)} placeholder={newRowKind === "section" ? "Section name" : "New line item"} className="max-w-xs" />
-        <select className="h-9 rounded-md border border-input bg-transparent px-2 text-sm" value={newRowKind} onChange={(event) => setNewRowKind(event.target.value as "input" | "section")}><option value="input">Line item</option><option value="section">Section</option></select>
+        <Input value={newRowName} onChange={(event) => setNewRowName(event.target.value)} placeholder={newRowKind === "section" ? "Heading name" : "New line item"} className="max-w-xs" />
+        <select className="h-9 rounded-md border border-input bg-transparent px-2 text-sm" value={newRowKind} onChange={(event) => setNewRowKind(event.target.value as "input" | "section")}><option value="input">Line item</option><option value="section">Heading only</option></select>
         <label className="flex h-9 items-center gap-2 text-sm"><input type="checkbox" checked={newRowBold} onChange={(event) => setNewRowBold(event.target.checked)} />Bold</label>
         <label className="flex h-9 items-center gap-2 text-sm"><input type="checkbox" checked={newRowGapAfter} onChange={(event) => setNewRowGapAfter(event.target.checked)} />Gap after</label>
         <Button type="submit" variant="ghost" disabled={isPending}>+ Add</Button>

@@ -18,7 +18,7 @@ async function AuthenticatedRedirect() {
   const { data } = await supabase.auth.getClaims();
 
   if (data?.claims) {
-    redirect("/dashboard");
+    redirect("/projects");
   }
 
   return null;
